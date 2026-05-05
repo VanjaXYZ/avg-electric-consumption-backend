@@ -1,0 +1,12 @@
+[
+  {
+    "tax_group": "household",
+    "vat": 0.17,
+    "eco_tax": 0.005
+  },
+  {
+    "tax_group": "business",
+    "vat": 0.20,
+    "eco_tax": 0.010
+  }
+]

@@ -1,0 +1,24 @@
+[
+  {
+    "id": 1,
+    "name": "Standard",
+    "pricing_tiers": [
+      { "threshold": 100, "price_per_kwh": 0.10 },
+      { "threshold": 300, "price_per_kwh": 0.08 },
+      { "threshold": 500, "price_per_kwh": 0.07 },
+      { "threshold": null, "price_per_kwh": 0.06 }
+    ],
+    "discount": 0.05
+  },
+  {
+    "id": 2,
+    "name": "Premium",
+    "pricing_tiers": [
+      { "threshold": 200, "price_per_kwh": 0.09 },
+      { "threshold": 400, "price_per_kwh": 0.07 },
+      { "threshold": 600, "price_per_kwh": 0.05 },
+      { "threshold": null, "price_per_kwh": 0.04 }
+    ],
+    "discount": 0.10
+  }
+]
