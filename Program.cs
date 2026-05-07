@@ -1,4 +1,7 @@
 using ElectricityPlanner.Domain.Entities;
+using ElectricityPlanner.Application.Services;
+using ElectricityPlanner.Application.DTOs;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddScoped<PricingService>();
 
 var app = builder.Build();
 
@@ -18,6 +22,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
 
 
 
