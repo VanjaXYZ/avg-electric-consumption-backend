@@ -6,5 +6,5 @@ public class PricingTier
     public int? Threshold { get; set; }
     public decimal PricePerKwh { get; set; }
     public int PlanId { get; set; }
-    public Plan Plan { get; set; }
+    public Plan? Plan { get; set; }
 }
