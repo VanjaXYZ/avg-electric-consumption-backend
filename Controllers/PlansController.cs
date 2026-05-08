@@ -42,6 +42,36 @@ public class PlansController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("{id:int}")]
+    [ProducesResponseType(typeof(PlanDTO), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<PlanDTO>> GetById([FromRoute] int id, CancellationToken cancellationToken)
+    {
+        var plan = await _db.Plans
+        .AsNoTracking()
+        .Include(p => p.PricingTiers)
+        .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+
+        if (plan is null) return NotFound(new { error = $"Plan with id {id} not found" });
+
+        var dto = new PlanDTO
+        {
+            Id = plan.Id,
+            Name = plan.Name,
+            Discount = plan.Discount,
+            PricingTiers = plan.PricingTiers
+                .OrderBy(t => t.Threshold ?? int.MaxValue)
+                .Select(t => new PricingTierDTO
+                {
+                    Id = t.Id,
+                    Threshold = t.Threshold,
+                    PricePerKwh = t.PricePerKwh
+                })
+                .ToList()
+        };
+        return Ok(dto);
+    }
+
 
 [HttpPost]
 [ProducesResponseType(typeof(PlanDTO), StatusCodes.Status201Created)]
