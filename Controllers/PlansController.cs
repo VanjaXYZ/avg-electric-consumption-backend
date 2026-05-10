@@ -1,5 +1,6 @@
 using ElectricityPlanner.Application.DTOs;
 using ElectricityPlanner.Infrastructure.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -74,6 +75,7 @@ public class PlansController : ControllerBase
 
 
 [HttpPost]
+[Authorize(Roles = "Admin")]
 [ProducesResponseType(typeof(PlanDTO), StatusCodes.Status201Created)]
 [ProducesResponseType(StatusCodes.Status400BadRequest)]
 public async Task<ActionResult<PlanDTO>> Create([FromBody] PlanUpsertRequest request, CancellationToken cancellationToken)
@@ -116,6 +118,7 @@ public async Task<ActionResult<PlanDTO>> Create([FromBody] PlanUpsertRequest req
 }
 
 [HttpPut("{id:int}")]
+[Authorize(Roles = "Admin")]
 [ProducesResponseType(typeof(PlanDTO), StatusCodes.Status200OK)]
 [ProducesResponseType(StatusCodes.Status400BadRequest)]
 [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -162,6 +165,7 @@ public async Task<ActionResult<PlanDTO>> Update([FromRoute] int id, [FromBody] P
 }
 
 [HttpDelete("{id:int}")]
+[Authorize(Roles = "Admin")]
 [ProducesResponseType(StatusCodes.Status204NoContent)]
 [ProducesResponseType(StatusCodes.Status404NotFound)]
 public async Task<ActionResult> Delete([FromRoute] int id, CancellationToken cancellationToken)

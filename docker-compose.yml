@@ -24,6 +24,10 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: >-
         Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Jwt__Issuer: ${JWT_ISSUER:-ElectricityPlanner}
+      Jwt__Audience: ${JWT_AUDIENCE:-ElectricityPlanner}
+      Jwt__SecretKey: ${JWT_SECRET_KEY}
+      Jwt__ExpiryMinutes: ${JWT_EXPIRY_MINUTES:-60}
     depends_on:
       db:
         condition: service_healthy

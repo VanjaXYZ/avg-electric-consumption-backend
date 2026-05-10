@@ -59,6 +59,39 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;..
 
 If neither env vars nor User Secrets supply the connection string, `GetConnectionString("DefaultConnection")` returns null and the app will fail at startup when configuring EF — this is intentional so misconfiguration is obvious.
 
+### JWT (startup + login + admin writes)
+
+The host loads **`Jwt`** settings at startup, validates bearer tokens on protected actions, and issues tokens from **`POST /auth/login`**.
+
+**Authorization:** **`POST`**, **`PUT`**, and **`DELETE`** on **`/plans`** and **`/tax-groups`** require an authenticated user with role **`Admin`**. **`GET`** on those resources, **`POST /recommendation`**, and **`POST /auth/login`** are anonymous.
+
+Set these via environment variables (double underscore) or User Secrets under section **`Jwt`**. Names must match **`JwtOptions`** in code: **`Jwt:SecretKey`** and **`Jwt:ExpiryMinutes`**, or the app will not pick up the key or lifetime you expect.
+
+| Key | Maps to env var | Notes |
+| --- | ---------------- | ----- |
+| `Jwt:Issuer` | `Jwt__Issuer` | Token issuer |
+| `Jwt:Audience` | `Jwt__Audience` | Token audience |
+| `Jwt:SecretKey` | `Jwt__SecretKey` | **At least 32 characters** |
+| `Jwt:ExpiryMinutes` | `Jwt__ExpiryMinutes` | Access token lifetime (minutes) |
+
+```powershell
+$env:Jwt__Issuer = "ElectricityPlanner"
+$env:Jwt__Audience = "ElectricityPlanner"
+$env:Jwt__SecretKey = "your-development-secret-key-32chars-min!!"
+$env:Jwt__ExpiryMinutes = "60"
+```
+
+```bash
+dotnet user-secrets set "Jwt:Issuer" "ElectricityPlanner"
+dotnet user-secrets set "Jwt:Audience" "ElectricityPlanner"
+dotnet user-secrets set "Jwt:SecretKey" "your-development-secret-key-32chars-min!!"
+dotnet user-secrets set "Jwt:ExpiryMinutes" "60"
+```
+
+**Login:** `POST /auth/login` with JSON `{ "username", "password" }`. After the first migration + seed, demo users are **`admin`** / **`lanaco2026`** (role `Admin`) and **`user`** / **`123456`** (role `User`). Send the returned JWT as the header **`Authorization: Bearer <token>`** on admin mutations.
+
+**Swagger / Postman:** In Swagger **Authorize**, paste **only the JWT**. If **`POST /plans`** (or similar) still returns **401** and the browser’s Network tab shows **no `Authorization` header**, use **Postman** or another HTTP client—the API is correct when that header is present.
+
 ## Running the API
 
 From this project folder (`ElectricityPlanner.Api`):
@@ -68,7 +101,7 @@ dotnet restore
 dotnet run
 ```
 
-Ensure **`ConnectionStrings__DefaultConnection`** is set first (see above).
+Ensure **`ConnectionStrings__DefaultConnection`** and **JWT** settings are set first (see above).
 
 By default (see `Properties/launchSettings.json`) the app listens on:
 
@@ -81,7 +114,7 @@ Swagger UI (Development only): **`http://localhost:5226/swagger`**
 
 From this project folder (where **`Dockerfile`** and **`docker-compose.yml`** live):
 
-1. Copy **`env.example`** to **`.env`** and set `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`. The file **`.env`** is listed in `.gitignore` and must not be committed.
+1. Copy **`env.example`** to **`.env`** and set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, and **`JWT_SECRET_KEY`** (at least 32 characters). Optional: `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_EXPIRY_MINUTES`. The file **`.env`** is listed in `.gitignore` and must not be committed.
 2. Build and start:
 
 ```bash
@@ -100,7 +133,7 @@ If port **5432** on your machine is already used by a local PostgreSQL instance,
 On startup, **`Program.cs`**:
 
 1. Applies pending EF Core migrations: `await db.Database.MigrateAsync();`
-2. Runs **`SeedData.SeedAsync`** if the database has no plans yet (initial sample plans and tax groups).
+2. Runs **`SeedData.SeedAsync`**: seeds **`AppUsers`** when empty, then sample **tax groups** and **plans** when there are no plans yet.
 
 ### Applying migrations manually (optional)
 
@@ -174,7 +207,7 @@ Host: localhost:5226
 
 ## Project structure (high level)
 
-- `Controllers/` — HTTP endpoints (`plans`, `tax-groups`, `recommendation`)
+- `Controllers/` — HTTP endpoints (`plans`, `tax-groups`, `recommendation`, `auth`)
 - `Application/` — services (`PricingService`), DTOs
 - `Domain/` — entities (`Plan`, `PricingTier`, `TaxGroup`)
 - `Infrastructure/Data/` — `AppDbContext`, seed

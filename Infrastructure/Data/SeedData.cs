@@ -1,5 +1,6 @@
 using ElectricityPlanner.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 
 namespace ElectricityPlanner.Infrastructure.Data;
 
@@ -7,6 +8,24 @@ public static class SeedData
 {
     public static async Task SeedAsync(AppDbContext db)
     {
+        if(!await db.AppUsers.AnyAsync())
+        {
+            var hasher = new PasswordHasher<AppUsers>();
+
+            var admin = new AppUsers { Username = "admin", Role = "Admin" };
+            admin.PasswordHash = hasher.HashPassword(admin, "lanaco2026");
+
+            var viewer = new AppUsers { Username = "user", Role = "User" };
+            viewer.PasswordHash = hasher.HashPassword(viewer, "123456");
+
+            db.AppUsers.AddRange(admin, viewer);
+            await db.SaveChangesAsync();
+        }
+
+
+
+
+
         if(await db.Plans.AnyAsync()) return;
 
         db.TaxGroups.AddRange(
