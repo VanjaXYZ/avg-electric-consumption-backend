@@ -77,6 +77,24 @@ By default (see `Properties/launchSettings.json`) the app listens on:
 
 Swagger UI (Development only): **`http://localhost:5226/swagger`**
 
+## Docker (API + PostgreSQL)
+
+From this project folder (where **`Dockerfile`** and **`docker-compose.yml`** live):
+
+1. Copy **`env.example`** to **`.env`** and set `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB`. The file **`.env`** is listed in `.gitignore` and must not be committed.
+2. Build and start:
+
+```bash
+docker compose build
+docker compose up
+```
+
+- API: **`http://localhost:5226`** (mapped to container port 8080).
+- Swagger: **`http://localhost:5226/swagger`** (`ASPNETCORE_ENVIRONMENT=Development` in compose).
+- Inside the Compose network the database host is **`db`**; the API connection string is built from the same `.env` values as Postgres.
+
+If port **5432** on your machine is already used by a local PostgreSQL instance, change the host mapping in `docker-compose.yml` for `db` (e.g. `"5433:5432"`). The API still uses **`Port=5432`** toward the `db` service.
+
 ## Database migrations and seed
 
 On startup, **`Program.cs`**:
