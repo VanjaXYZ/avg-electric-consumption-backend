@@ -63,7 +63,7 @@ If neither env vars nor User Secrets supply the connection string, `GetConnectio
 
 The host loads **`Jwt`** settings at startup, validates bearer tokens on protected actions, and issues tokens from **`POST /auth/login`**.
 
-**Authorization:** **`POST`**, **`PUT`**, and **`DELETE`** on **`/plans`** and **`/tax-groups`**, and **`GET /analytics/plan-selections/summary`**, require an authenticated user with role **`Admin`**. **`GET`** on **`/plans`** and **`/tax-groups`**, **`POST /recommendation`**, and **`POST /auth/login`** are anonymous.
+**Authorization:** **`POST`**, **`PUT`**, and **`DELETE`** on **`/plans`** and **`/tax-groups`**, and **`GET /analytics/plan-selections/summary`** and **`GET /analytics/plan-selections/trends`**, require an authenticated user with role **`Admin`**. **`GET`** on **`/plans`** and **`/tax-groups`**, **`POST /recommendation`**, and **`POST /auth/login`** are anonymous.
 
 Set these via environment variables (double underscore) or User Secrets under section **`Jwt`**. Names must match **`JwtOptions`** in code: **`Jwt:SecretKey`** and **`Jwt:ExpiryMinutes`**, or the app will not pick up the key or lifetime you expect.
 
@@ -208,6 +208,16 @@ Authorization: Bearer <admin_jwt>
 ```
 
 Use the **`token`** from **`POST /auth/login`** as user **`admin`**. Response: JSON array with **`planId`**, **`planName`**, **`selectionCount`** (descending by count). Same **`Admin`** JWT as for **`POST /plans`**; if Swagger omits **`Authorization`**, use Postman.
+
+**Trends by date range (Admin only):** counts per **UTC calendar day** and per **recommended plan** between **`from`** and **`to`** (inclusive). Query parameters use ISO dates `yyyy-MM-dd`. Maximum span: **366** days. Returns **`400`** if `from` is after `to`, or if the range is too wide.
+
+```http
+GET /analytics/plan-selections/trends?from=2026-05-01&to=2026-05-31 HTTP/1.1
+Host: localhost:5226
+Authorization: Bearer <admin_jwt>
+```
+
+Use **`GET`** with **no body**; send the JWT only in **`Authorization`**. Response rows: **`date`** (midnight UTC for that day bucket), **`planId`**, **`planName`**, **`count`**, ordered by date then plan name — suitable for line or bar charts in a frontend.
 
 ## Tech stack
 
