@@ -12,11 +12,13 @@ public class RecommendationController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly PricingService _pricing;
+    private readonly IPlanSelectionAnalytics _analytics;
 
-    public RecommendationController(AppDbContext db, PricingService pricing)
+    public RecommendationController(AppDbContext db, PricingService pricing, IPlanSelectionAnalytics analytics)
     {
         _db = db;
         _pricing = pricing;
+        _analytics = analytics;
     }
 
     [HttpPost]
@@ -52,6 +54,8 @@ public class RecommendationController : ControllerBase
             Recommended = all.First(),
             AllPlans = all
         };
+
+        await _analytics.RecordRecommendationAsync(request, tax.Id, response.Recommended, cancellationToken);
 
         return Ok(response);
     }

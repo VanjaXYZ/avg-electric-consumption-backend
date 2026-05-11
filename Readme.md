@@ -63,7 +63,7 @@ If neither env vars nor User Secrets supply the connection string, `GetConnectio
 
 The host loads **`Jwt`** settings at startup, validates bearer tokens on protected actions, and issues tokens from **`POST /auth/login`**.
 
-**Authorization:** **`POST`**, **`PUT`**, and **`DELETE`** on **`/plans`** and **`/tax-groups`** require an authenticated user with role **`Admin`**. **`GET`** on those resources, **`POST /recommendation`**, and **`POST /auth/login`** are anonymous.
+**Authorization:** **`POST`**, **`PUT`**, and **`DELETE`** on **`/plans`** and **`/tax-groups`**, and **`GET /analytics/plan-selections/summary`**, require an authenticated user with role **`Admin`**. **`GET`** on **`/plans`** and **`/tax-groups`**, **`POST /recommendation`**, and **`POST /auth/login`** are anonymous.
 
 Set these via environment variables (double underscore) or User Secrets under section **`Jwt`**. Names must match **`JwtOptions`** in code: **`Jwt:SecretKey`** and **`Jwt:ExpiryMinutes`**, or the app will not pick up the key or lifetime you expect.
 
@@ -195,6 +195,20 @@ GET /tax-groups HTTP/1.1
 Host: localhost:5226
 ```
 
+### Analytics — plan selection tracking
+
+Each successful **`POST /recommendation`** persists one row in **`PlanSelectionEvents`**: UTC time, **kWh**, **tax group id**, **recommended plan id**, and **recommended grand total** at the time of the response (for behaviour analytics). No extra request body is required beyond the normal recommendation payload.
+
+**Summary (Admin only):** aggregate counts per recommended plan:
+
+```http
+GET /analytics/plan-selections/summary HTTP/1.1
+Host: localhost:5226
+Authorization: Bearer <admin_jwt>
+```
+
+Use the **`token`** from **`POST /auth/login`** as user **`admin`**. Response: JSON array with **`planId`**, **`planName`**, **`selectionCount`** (descending by count). Same **`Admin`** JWT as for **`POST /plans`**; if Swagger omits **`Authorization`**, use Postman.
+
 ## Tech stack
 
 | Layer | Technology |
@@ -207,9 +221,9 @@ Host: localhost:5226
 
 ## Project structure (high level)
 
-- `Controllers/` — HTTP endpoints (`plans`, `tax-groups`, `recommendation`, `auth`)
-- `Application/` — services (`PricingService`), DTOs
-- `Domain/` — entities (`Plan`, `PricingTier`, `TaxGroup`)
+- `Controllers/` — HTTP endpoints (`plans`, `tax-groups`, `recommendation`, `auth`, `analytics`)
+- `Application/` — services (`PricingService`, `PlanSelectionAnalytics`), DTOs
+- `Domain/` — entities (`Plan`, `PricingTier`, `TaxGroup`, `PlanSelectionEvent`, `AppUsers`)
 - `Infrastructure/Data/` — `AppDbContext`, seed
 
 ## Running automated tests

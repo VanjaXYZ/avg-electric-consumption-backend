@@ -39,6 +39,7 @@ builder.Services.AddSwaggerGen(c =>
     }
 );
 builder.Services.AddScoped<PricingService>();
+builder.Services.AddScoped<IPlanSelectionAnalytics, PlanSelectionAnalytics>();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 

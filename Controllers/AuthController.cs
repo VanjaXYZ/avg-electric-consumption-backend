@@ -47,12 +47,13 @@ public class AuthController : ControllerBase
         var tokenExpires = DateTime.UtcNow.AddMinutes(_jwt.ExpiryMinutes);
         var token = CreateJwtToken(user, tokenExpires);
 
-     return Ok(new LoginResponse 
-     {
-        Token = token,
-        ExpiresAt = tokenExpires,
-        Role = user.Role
-     });
+        return Ok(new LoginResponse
+        {
+            Token = token,
+            ExpiresAt = tokenExpires,
+            Role = user.Role,
+            Username = user.Username,
+        });
     }
 
 
