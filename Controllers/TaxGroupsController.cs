@@ -24,6 +24,7 @@ public class TaxGroupsController : ControllerBase
     {
         var groups = await _db.TaxGroups
         .AsNoTracking()
+        .Where(t => !t.IsDeleted)
         .OrderBy(t => t.Id)
         .Select(t => new TaxGroupDTO
         {
@@ -48,7 +49,7 @@ public class TaxGroupsController : ControllerBase
         if (request.Vat < 0 || request.EcoTax < 0) return BadRequest(new { error = "Vat and EcoTax must be non-negative" });
 
         var exists = await _db.TaxGroups.AnyAsync(
-            t => t.Name.ToLower() == request.Name.Trim().ToLower(),
+            t => !t.IsDeleted && t.Name.ToLower() == request.Name.Trim().ToLower(),
             cancellationToken
         );
 
@@ -58,7 +59,8 @@ public class TaxGroupsController : ControllerBase
         {
             Name = request.Name.Trim(),
             Vat = request.Vat,
-            EcoTax = request.EcoTax
+            EcoTax = request.EcoTax,
+            IsDeleted = false
         };
         
         _db.TaxGroups.Add(entity);
@@ -89,14 +91,14 @@ public class TaxGroupsController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Name)) return BadRequest(new { error = "Name is required" });
         if (request.Vat < 0 || request.EcoTax < 0) return BadRequest(new { error = "Vat and EcoTax must be non-negative" });
 
-        var entity = await _db.TaxGroups.FindAsync([id], cancellationToken);
+        var entity = await _db.TaxGroups.FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted, cancellationToken);
 
         if (entity is null) return NotFound(new {error = $"Tax group with id {id} not found"});
 
         var name = request.Name.Trim();
 
         var exists = await _db.TaxGroups.AnyAsync(
-            t => t.Id != id && t.Name.ToLower() == name.ToLower(),
+            t => !t.IsDeleted && t.Id != id && t.Name.ToLower() == name.ToLower(),
             cancellationToken
         );
 
@@ -126,11 +128,12 @@ public class TaxGroupsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Delete([FromRoute] int id, CancellationToken cancellationToken)
     {
-        var entity = await _db.TaxGroups.FindAsync([id], cancellationToken);
+        var entity = await _db.TaxGroups.FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
         if(entity is null) return NotFound(new {error = $"Tax group with id {id} not found"});
+        if (entity.IsDeleted) return NoContent();
 
-        _db.TaxGroups.Remove(entity);
+        entity.IsDeleted = true;
         await _db.SaveChangesAsync(cancellationToken);
 
         return NoContent();

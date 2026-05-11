@@ -24,6 +24,16 @@ public class AppDbContext : DbContext
         entity.Property(e => e.Role).HasMaxLength(32);
     });
 
+    modelBuilder.Entity<Plan>(entity =>
+    {
+        entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+    });
+
+    modelBuilder.Entity<TaxGroup>(entity =>
+    {
+        entity.Property(e => e.IsDeleted).HasDefaultValue(false);
+    });
+
      modelBuilder.Entity<PlanSelectionEvent>(entity =>
     {
         entity.ToTable("PlanSelectionEvents");

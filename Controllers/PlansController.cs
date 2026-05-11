@@ -22,6 +22,7 @@ public class PlansController : ControllerBase
     {
         var plans = await _db.Plans
             .AsNoTracking()
+            .Where(p => !p.IsDeleted)
             .Include(p => p.PricingTiers)
             .OrderBy(p => p.Id)
             .ToListAsync(cancellationToken);
@@ -51,7 +52,7 @@ public class PlansController : ControllerBase
         var plan = await _db.Plans
         .AsNoTracking()
         .Include(p => p.PricingTiers)
-        .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, cancellationToken);
 
         if (plan is null) return NotFound(new { error = $"Plan with id {id} not found" });
 
@@ -89,6 +90,7 @@ public async Task<ActionResult<PlanDTO>> Create([FromBody] PlanUpsertRequest req
     {
         Name = request.Name.Trim(),
         Discount = request.Discount,
+        IsDeleted = false,
         PricingTiers = request.PricingTiers.Select(t => new ElectricityPlanner.Domain.Entities.PricingTier
         {
             Threshold = t.Threshold,
@@ -129,7 +131,7 @@ public async Task<ActionResult<PlanDTO>> Update([FromRoute] int id, [FromBody] P
     if (request.PricingTiers is null || request.PricingTiers.Count == 0) return BadRequest(new { error = "At least one pricing tier is required" });
     if (request.PricingTiers.Any(t => t.PricePerKwh <= 0)) return BadRequest(new { error = "Price per kwh must be positive" });
 
-    var plan = await _db.Plans.Include(p => p.PricingTiers).FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+    var plan = await _db.Plans.Include(p => p.PricingTiers).FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, cancellationToken);
 
     if (plan is null) return NotFound(new { error = $"Plan with id {id} not found" });
 
@@ -170,9 +172,10 @@ public async Task<ActionResult<PlanDTO>> Update([FromRoute] int id, [FromBody] P
 [ProducesResponseType(StatusCodes.Status404NotFound)]
 public async Task<ActionResult> Delete([FromRoute] int id, CancellationToken cancellationToken)
 {
-    var plan = await _db.Plans.FindAsync([id], cancellationToken);
+    var plan = await _db.Plans.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
     if (plan is null) return NotFound(new { error = $"Plan with id {id} not found" });
-    _db.Plans.Remove(plan);
+    if (plan.IsDeleted) return NoContent();
+    plan.IsDeleted = true;
     await _db.SaveChangesAsync(cancellationToken);
     return NoContent();
 }

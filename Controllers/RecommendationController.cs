@@ -31,12 +31,15 @@ public class RecommendationController : ControllerBase
 
         var tax = await _db.TaxGroups
         .AsNoTracking()
-        .FirstOrDefaultAsync(t => t.Name.ToLower() == request.TaxGroup.ToLower(), cancellationToken);
+        .FirstOrDefaultAsync(
+            t => !t.IsDeleted && t.Name.ToLower() == request.TaxGroup.ToLower(),
+            cancellationToken);
 
         if(tax is null) return BadRequest(new { error = $"Unknown tax group: {request.TaxGroup}" });
 
         var plans = await _db.Plans
         .AsNoTracking()
+        .Where(p => !p.IsDeleted)
         .Include(p => p.PricingTiers)
         .ToListAsync(cancellationToken);
 

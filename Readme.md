@@ -195,6 +195,14 @@ GET /tax-groups HTTP/1.1
 Host: localhost:5226
 ```
 
+### Delete plan (soft delete)
+
+**`DELETE /plans/{id}`** (Admin) sets **`IsDeleted`** on the plan row instead of removing it. The plan disappears from **`GET /plans`**, **`GET /plans/{id}`**, and **`POST /recommendation`**, but **analytics** rows that reference it stay valid (no foreign key errors). Repeating **`DELETE`** on an already deleted plan returns **`204`** (idempotent).
+
+### Delete tax group (soft delete)
+
+**`DELETE /tax-groups/{id}`** (Admin) sets **`IsDeleted`** on the tax group row. It no longer appears in **`GET /tax-groups`** or in **`POST /recommendation`** (unknown tax group), while **analytics** rows that reference it keep a valid FK. Second **`DELETE`** on the same id returns **`204`**.
+
 ### Analytics — plan selection tracking
 
 Each successful **`POST /recommendation`** persists one row in **`PlanSelectionEvents`**: UTC time, **kWh**, **tax group id**, **recommended plan id**, and **recommended grand total** at the time of the response (for behaviour analytics). No extra request body is required beyond the normal recommendation payload.

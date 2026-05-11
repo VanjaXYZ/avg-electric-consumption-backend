@@ -26,7 +26,7 @@ public static class SeedData
 
 
 
-        if(await db.Plans.AnyAsync()) return;
+        if (await db.Plans.AnyAsync()) return;
 
         db.TaxGroups.AddRange(
             new TaxGroup { Name = "household", Vat = 0.17m, EcoTax = 0.005m },
