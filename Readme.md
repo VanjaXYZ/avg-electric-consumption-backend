@@ -63,7 +63,7 @@ If neither env vars nor User Secrets supply the connection string, `GetConnectio
 
 The host loads **`Jwt`** settings at startup, validates bearer tokens on protected actions, and issues tokens from **`POST /auth/login`**.
 
-**Authorization:** **`POST`**, **`PUT`**, and **`DELETE`** on **`/plans`** and **`/tax-groups`**, and **`GET /analytics/plan-selections/summary`** and **`GET /analytics/plan-selections/trends`**, require an authenticated user with role **`Admin`**. **`GET`** on **`/plans`** and **`/tax-groups`**, **`POST /recommendation`**, and **`POST /auth/login`** are anonymous.
+**Authorization:** **`POST`**, **`PUT`**, and **`DELETE`** on **`/plans`** and **`/tax-groups`**, and **`GET /analytics/plan-selections/summary`** and **`GET /analytics/plan-selections/trends`**, require an authenticated user with role **`Admin`**. **`GET`** on **`/plans`** and **`/tax-groups`**, **`POST /recommendation`**, **`POST /recommendation/email`**, and **`POST /auth/login`** are anonymous.
 
 Set these via environment variables (double underscore) or User Secrets under section **`Jwt`**. Names must match **`JwtOptions`** in code: **`Jwt:SecretKey`** and **`Jwt:ExpiryMinutes`**, or the app will not pick up the key or lifetime you expect.
 
@@ -92,6 +92,62 @@ dotnet user-secrets set "Jwt:ExpiryMinutes" "60"
 
 **Swagger / Postman:** In Swagger **Authorize**, paste **only the JWT**. If **`POST /plans`** (or similar) still returns **401** and the browser’s Network tab shows **no `Authorization` header**, use **Postman** or another HTTP client—the API is correct when that header is present.
 
+### SMTP (optional — send recommendation by email)
+
+**`POST /recommendation/email`** sends an HTML summary to **`ToEmail`** after computing the same recommendation as **`POST /recommendation`**. If **`Smtp:Host`** is not set, that endpoint returns **`400`** with a message to configure SMTP (the rest of the API still starts).
+
+| Key | Maps to env var |
+| --- | ---------------- |
+| `Smtp:Host` | `Smtp__Host` |
+| `Smtp:Port` | `Smtp__Port` (default **587** in code if omitted) |
+| `Smtp:Username` | `Smtp__Username` |
+| `Smtp:Password` | `Smtp__Password` |
+| `Smtp:FromEmail` | `Smtp__FromEmail` |
+| `Smtp:FromName` | `Smtp__FromName` |
+
+Use [Mailtrap](https://mailtrap.io) (or similar) for development: copy SMTP host, port, username, and password from the inbox settings into User Secrets. Port **465** uses implicit SSL; **587** uses STARTTLS.
+
+### Testing email (Mailtrap Sandbox)
+
+These steps exercise **`POST /recommendation/email`** without sending real internet mail from the sandbox.
+
+1. Sign in to [Mailtrap](https://mailtrap.io) and open **Email Testing** → your **Sandbox** inbox (e.g. *My Sandbox*).
+2. Go to **Integration** → sub-tab **SMTP** (not the Transactional **Email API** / Bearer flow — this API connects with **SMTP** credentials via MailKit).
+3. Copy **Host**, **Port**, **Username**, and **Password** from that screen. Use port **587** (STARTTLS) unless your network blocks it, then try **2525**. Reveal or copy the **full** password (the masked value is not enough).
+4. From this project folder, set User Secrets (same keys as the SMTP table above; `Smtp:Username` matches the property name in code — not `Smtp:User`):
+
+   ```powershell
+   dotnet user-secrets set "Smtp:Host" "sandbox.smtp.mailtrap.io"
+   dotnet user-secrets set "Smtp:Port" "587"
+   dotnet user-secrets set "Smtp:Username" "<paste from Mailtrap>"
+   dotnet user-secrets set "Smtp:Password" "<paste from Mailtrap>"
+   dotnet user-secrets set "Smtp:FromEmail" "noreply@example.com"
+   dotnet user-secrets set "Smtp:FromName" "Electricity Planner"
+   ```
+
+   Replace `FromEmail` / `FromName` as you like for development; the sandbox mainly needs a well-formed **From** address.
+
+5. Configure **PostgreSQL** and **JWT**, then run **`dotnet run`** (see [Running the API](#running-the-api)).
+6. Send a request with **`Content-Type: application/json`**, e.g. Swagger **`POST /recommendation/email`** or:
+
+   ```http
+   POST /recommendation/email HTTP/1.1
+   Host: localhost:5226
+   Content-Type: application/json
+
+   {
+     "kwh": 3500,
+     "taxGroup": "household",
+     "toEmail": "you@example.com"
+   }
+   ```
+
+   Seed tax groups include **`household`** and **`business`**.
+
+7. Refresh the **Mailtrap Sandbox** inbox in the browser — the message should appear there shortly.
+
+**Sandbox vs real inbox:** Email Testing **does not deliver** to the address in `toEmail` on the public internet; messages stay in the Mailtrap UI for inspection. If the message shows in Mailtrap but not in Gmail, that is expected. For real delivery, use **Mailtrap Sending** / another transactional SMTP provider, **verify your domain**, and point **`Smtp:*`** at that provider’s SMTP host and credentials.
+
 ## Running the API
 
 From this project folder (`ElectricityPlanner.Api`):
@@ -101,7 +157,7 @@ dotnet restore
 dotnet run
 ```
 
-Ensure **`ConnectionStrings__DefaultConnection`** and **JWT** settings are set first (see above).
+Ensure **`ConnectionStrings__DefaultConnection`** and **JWT** settings are set first (see above). **SMTP** is only required if you use **`POST /recommendation/email`**.
 
 By default (see `Properties/launchSettings.json`) the app listens on:
 
@@ -114,7 +170,7 @@ Swagger UI (Development only): **`http://localhost:5226/swagger`**
 
 From this project folder (where **`Dockerfile`** and **`docker-compose.yml`** live):
 
-1. Copy **`env.example`** to **`.env`** and set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, and **`JWT_SECRET_KEY`** (at least 32 characters). Optional: `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_EXPIRY_MINUTES`. The file **`.env`** is listed in `.gitignore` and must not be committed.
+1. Copy **`env.example`** to **`.env`** and set `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, and **`JWT_SECRET_KEY`** (at least 32 characters). Optional: `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_EXPIRY_MINUTES`, and **`SMTP_*`** keys if you use recommendation email inside Docker. The file **`.env`** is listed in `.gitignore` and must not be committed.
 2. Build and start:
 
 ```bash
@@ -188,6 +244,22 @@ Content-Type: application/json
 }
 ```
 
+### Recommendation by email
+
+Same calculation as **`POST /recommendation`**, plus an HTML email to **`toEmail`**. Returns **`502`** if SMTP fails after validation. Logs analytics the same way as **`POST /recommendation`** after a successful send.
+
+```http
+POST /recommendation/email HTTP/1.1
+Host: localhost:5226
+Content-Type: application/json
+
+{
+  "kwh": 350,
+  "taxGroup": "household",
+  "toEmail": "you@example.com"
+}
+```
+
 ### List tax groups
 
 ```http
@@ -205,7 +277,7 @@ Host: localhost:5226
 
 ### Analytics — plan selection tracking
 
-Each successful **`POST /recommendation`** persists one row in **`PlanSelectionEvents`**: UTC time, **kWh**, **tax group id**, **recommended plan id**, and **recommended grand total** at the time of the response (for behaviour analytics). No extra request body is required beyond the normal recommendation payload.
+Each successful **`POST /recommendation`** or **`POST /recommendation/email`** (after a successful email send) persists one row in **`PlanSelectionEvents`**: UTC time, **kWh**, **tax group id**, **recommended plan id**, and **recommended grand total** at the time of the response (for behaviour analytics). No extra request body is required beyond the normal recommendation payload.
 
 **Summary (Admin only):** aggregate counts per recommended plan:
 
@@ -240,9 +312,10 @@ Use **`GET`** with **no body**; send the JWT only in **`Authorization`**. Respon
 ## Project structure (high level)
 
 - `Controllers/` — HTTP endpoints (`plans`, `tax-groups`, `recommendation`, `auth`, `analytics`)
-- `Application/` — services (`PricingService`, `PlanSelectionAnalytics`), DTOs
+- `Application/` — services (`PricingService`, `RecommendationService`, `PlanSelectionAnalytics`), DTOs
 - `Domain/` — entities (`Plan`, `PricingTier`, `TaxGroup`, `PlanSelectionEvent`, `AppUsers`)
 - `Infrastructure/Data/` — `AppDbContext`, seed
+- `Infrastructure/Email/` — SMTP recommendation email sender
 
 ## Running automated tests
 

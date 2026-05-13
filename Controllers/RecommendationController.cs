@@ -1,8 +1,9 @@
 using ElectricityPlanner.Application.DTOs;
 using ElectricityPlanner.Application.Services;
-using ElectricityPlanner.Infrastructure.Data;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using MimeKit;
 
 namespace ElectricityPlanner.Api.Controllers;
 
@@ -10,15 +11,18 @@ namespace ElectricityPlanner.Api.Controllers;
 [Route("recommendation")]
 public class RecommendationController : ControllerBase
 {
-    private readonly AppDbContext _db;
-    private readonly PricingService _pricing;
     private readonly IPlanSelectionAnalytics _analytics;
+    private readonly RecommendationService _recommendation;
+    private readonly IRecommendationEmailSender _email;
 
-    public RecommendationController(AppDbContext db, PricingService pricing, IPlanSelectionAnalytics analytics)
+    public RecommendationController(
+        IPlanSelectionAnalytics analytics,
+        RecommendationService recommendation,
+        IRecommendationEmailSender email)
     {
-        _db = db;
-        _pricing = pricing;
         _analytics = analytics;
+        _recommendation = recommendation;
+        _email = email;
     }
 
     [HttpPost]
@@ -26,39 +30,67 @@ public class RecommendationController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<RecommendationResponse>> Recommend([FromBody] RecommendationRequest request, CancellationToken cancellationToken)
     {
-        if (request.Kwh <= 0) return BadRequest(new { error = "Kwh must be greater than 0" });
-        if (string.IsNullOrWhiteSpace(request.TaxGroup)) return BadRequest(new { error = "Tax group is required" });
+        var (response, taxGroupId, error) = await _recommendation.BuildAsync(request.Kwh, request.TaxGroup, cancellationToken);
+        if (error is not null) return BadRequest(new { error });
 
-        var tax = await _db.TaxGroups
-        .AsNoTracking()
-        .FirstOrDefaultAsync(
-            t => !t.IsDeleted && t.Name.ToLower() == request.TaxGroup.ToLower(),
+        await _analytics.RecordRecommendationAsync(request, taxGroupId!.Value, response!.Recommended, cancellationToken);
+
+        return Ok(response);
+    }
+
+    [HttpPost("email")]
+    [ProducesResponseType(typeof(RecommendationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status502BadGateway)]
+    public async Task<ActionResult<RecommendationResponse>> RecommendAndEmail(
+        [FromBody] RecommendationEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.ToEmail)) return BadRequest(new { error = "ToEmail is required." });
+
+        try
+        {
+            _ = MailboxAddress.Parse(request.ToEmail.Trim());
+        }
+        catch (ParseException)
+        {
+            return BadRequest(new { error = "ToEmail is not a valid email address." });
+        }
+
+        var (response, taxGroupId, error) = await _recommendation.BuildAsync(request.Kwh, request.TaxGroup, cancellationToken);
+        if (error is not null) return BadRequest(new { error });
+
+        try
+        {
+            await _email.SendRecommendationAsync(
+                request.ToEmail.Trim(),
+                request.Kwh,
+                request.TaxGroup.Trim(),
+                response!,
+                cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (AuthenticationException ex)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { error = "Failed to send email.", detail = ex.Message });
+        }
+        catch (SmtpCommandException ex)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { error = "Failed to send email.", detail = ex.Message });
+        }
+        catch (SmtpProtocolException ex)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { error = "Failed to send email.", detail = ex.Message });
+        }
+
+        await _analytics.RecordRecommendationAsync(
+            new RecommendationRequest { Kwh = request.Kwh, TaxGroup = request.TaxGroup },
+            taxGroupId!.Value,
+            response!.Recommended,
             cancellationToken);
-
-        if(tax is null) return BadRequest(new { error = $"Unknown tax group: {request.TaxGroup}" });
-
-        var plans = await _db.Plans
-        .AsNoTracking()
-        .Where(p => !p.IsDeleted)
-        .Include(p => p.PricingTiers)
-        .ToListAsync(cancellationToken);
-
-        if (plans.Count == 0) return BadRequest(new { error = "No plans found" });
-
-        var all = plans.Select(p => new PlanComparisonDto
-        {
-            PlanId = p.Id,
-            PlanName = p.Name,
-            Costs = _pricing.CalculateCostBreakdown(request.Kwh, p, tax)
-        }).OrderBy(p => p.Costs.GrandTotal).ToList();
-
-        var response = new RecommendationResponse
-        {
-            Recommended = all.First(),
-            AllPlans = all
-        };
-
-        await _analytics.RecordRecommendationAsync(request, tax.Id, response.Recommended, cancellationToken);
 
         return Ok(response);
     }

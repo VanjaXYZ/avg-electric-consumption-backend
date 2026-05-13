@@ -2,6 +2,7 @@ using ElectricityPlanner.Domain.Entities;
 using ElectricityPlanner.Application.Services;
 using ElectricityPlanner.Application.DTOs;
 using ElectricityPlanner.Infrastructure.Data;
+using ElectricityPlanner.Infrastructure.Email;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text;
@@ -39,7 +40,10 @@ builder.Services.AddSwaggerGen(c =>
     }
 );
 builder.Services.AddScoped<PricingService>();
+builder.Services.AddScoped<RecommendationService>();
 builder.Services.AddScoped<IPlanSelectionAnalytics, PlanSelectionAnalytics>();
+builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection(SmtpOptions.SectionName));
+builder.Services.AddScoped<IRecommendationEmailSender, SmtpRecommendationEmailSender>();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
