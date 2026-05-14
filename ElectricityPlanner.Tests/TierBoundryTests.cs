@@ -26,9 +26,9 @@ public class TierBoundaryTests
     };
 
     [Theory]
-    [InlineData(100, 10.00, 11.700000)]   // samo prvi pojas
-    [InlineData(300, 26.00, 30.654000)]   // prvi + drugi pojas (do 300)
-    [InlineData(500, 40.00, 47.385000)]   // prva tri pojasa (do 500)
+    [InlineData(100, 10.00, 11.700000)]
+    [InlineData(300, 26.00, 30.654000)]
+    [InlineData(500, 40.00, 47.385000)]
     public void StandardPlan_BoundaryKwh_Household(
         decimal kwh,
         decimal expectedEnergySubtotal,

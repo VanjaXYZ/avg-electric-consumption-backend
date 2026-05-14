@@ -316,11 +316,14 @@ Use **`GET`** with **no body**; send the JWT only in **`Authorization`**. Respon
 - `Domain/` — entities (`Plan`, `PricingTier`, `TaxGroup`, `PlanSelectionEvent`, `AppUsers`)
 - `Infrastructure/Data/` — `AppDbContext`, seed
 - `Infrastructure/Email/` — SMTP recommendation email sender
+- `ElectricityPlanner.Tests/` — xUnit: unit tests (`PricingService`, …) and **EF InMemory integration-style tests** (`RecommendationService`, `PlanSelectionAnalytics` with `SeedData`; no Docker)
 
 ## Running automated tests
 
-If you have a companion xUnit project referencing this API:
+From the API project folder, the test project lives at **`ElectricityPlanner.Tests/ElectricityPlanner.Tests.csproj`**:
 
 ```bash
-dotnet test path/to/ElectricityPlanner.Tests.csproj
+dotnet test ElectricityPlanner.Tests/ElectricityPlanner.Tests.csproj
 ```
+
+**Integration-style tests** use **EF Core InMemory** plus the same services and `SeedData` as the API (no `WebApplicationFactory`, no PostgreSQL, no Docker). They validate recommendation and analytics persistence against a real `AppDbContext` instance.

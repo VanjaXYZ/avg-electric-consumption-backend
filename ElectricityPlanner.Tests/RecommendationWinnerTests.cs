@@ -51,7 +51,6 @@ public class RecommendationWinnerTests
         var premiumTotal = service.CalculateCostBreakdown(kwh, premium, household).GrandTotal;
 
         Assert.True(premiumTotal < standardTotal);
-        // opciono i tačne vrijednosti koje već znaš iz API-ja:
         Assert.Equal(34.836750m, standardTotal);
         Assert.Equal(32.058000m, premiumTotal);
     }
